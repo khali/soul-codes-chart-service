@@ -56,6 +56,11 @@ class ChartRequest(BaseModel):
     latitude: float | None = Field(default=None, ge=-90, le=90)
     longitude: float | None = Field(default=None, ge=-180, le=180)
     timezone: str | None = Field(default=None, max_length=64)
+    # Refuse (422 place_ambiguous) instead of guessing when `place` is a bare name that other
+    # countries share. Off by default: a person reviewing the chart can read the warning.
+    reject_ambiguous_place: bool = Field(default=False, alias="rejectAmbiguousPlace")
+
+    model_config = ConfigDict(populate_by_name=True)
 
     @field_validator("name", "place")
     @classmethod

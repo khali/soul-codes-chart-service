@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from soulcodes_chart_service.errors import PlaceNotFound, TimezoneNotFound
+from soulcodes_chart_service.errors import PlaceAmbiguous, PlaceNotFound, TimezoneNotFound
 from soulcodes_chart_service.geo.offline import GeoMatch, OfflineGeocoder
 from soulcodes_chart_service.geo.resolver import resolve_location
 from soulcodes_chart_service.geo.text import normalise_name
@@ -107,6 +107,37 @@ class TestResolveLocation:
             "More than one place is called Wellington. We used Wellington, New Zealand; if that "
             "is wrong, add the country to the birthplace or send coordinates."
         ]
+
+    def test_ambiguous_place_can_be_refused_instead_of_guessed(self) -> None:
+        match = GeoMatch("Wellington", "NZ", -41.28, 174.77, "Pacific/Auckland", ambiguous=True)
+        with pytest.raises(PlaceAmbiguous) as err:
+            resolve_location(
+                "Wellington",
+                None,
+                None,
+                None,
+                FakeGeocoder({"Wellington": match}),
+                FakeTimezones(),
+                reject_ambiguous=True,
+            )
+        assert err.value.code == "place_ambiguous" and err.value.status == 422
+        assert "Wellington, New Zealand" in err.value.message
+
+    def test_refusing_ambiguity_leaves_clear_places_and_coordinates_alone(self) -> None:
+        clear = resolve_location(
+            "Sydney, Australia", None, None, None, FakeGeocoder(), FakeTimezones(), reject_ambiguous=True
+        )
+        assert clear.timezone == "Australia/Sydney"
+        given = resolve_location(
+            "Wellington",
+            -41.3,
+            174.8,
+            "Pacific/Auckland",
+            FakeGeocoder({}),
+            FakeTimezones(),
+            reject_ambiguous=True,
+        )
+        assert given.timezone == "Pacific/Auckland"
 
     def test_unknown_place(self) -> None:
         with pytest.raises(PlaceNotFound) as err:

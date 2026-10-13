@@ -71,6 +71,7 @@ Header `Authorization: Bearer <CHART_SERVICE_TOKEN>` (compared in constant time)
 | `place` | string, 1 to 200 chars | Geocoded when coordinates are missing; always echoed back. |
 | `latitude`, `longitude` | number or `null` | Must be given together. When given, they win over `place`. |
 | `timezone` | IANA name or `null` | e.g. `"Australia/Sydney"` (case-insensitive). When given, it wins. Otherwise taken from the geocoded place, or looked up from the coordinates. |
+| `rejectAmbiguousPlace` | boolean, default `false` | When `true`, a bare place name that other countries share ("Wellington") is refused with `place_ambiguous` instead of being guessed with a warning. For callers with nobody to check the guess, such as the door's self-serve form. |
 
 Response: a `ChartPayload` (the models are in `src/soulcodes_chart_service/models.py`).
 
@@ -83,6 +84,7 @@ Errors always look like `{"error": {"code": "...", "message": "..."}}`:
 | 404 / 405 | `not_found` / `method_not_allowed` | Unknown route or method. |
 | 422 | `invalid_request` | A field failed validation; the message names it. |
 | 422 | `place_not_found` | The place could not be geocoded. Send coordinates and a time zone instead. |
+| 422 | `place_ambiguous` | Only with `rejectAmbiguousPlace`: more than one country has a place of that name. Add the country, or send coordinates. |
 | 422 | `timezone_not_found` | No time zone for the coordinates (for example, mid-ocean). Send `timezone`. |
 | 500 | `internal_error` | Anything unexpected. Details go to the log, never to the caller. |
 

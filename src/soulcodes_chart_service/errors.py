@@ -25,6 +25,18 @@ class PlaceNotFound(ServiceError):
         )
 
 
+class PlaceAmbiguous(ServiceError):
+    """Only raised when the caller asked for it (`rejectAmbiguousPlace`): see geo/resolver.py."""
+
+    def __init__(self, name: str, country: str) -> None:
+        super().__init__(
+            422,
+            "place_ambiguous",
+            f"More than one place is called {name}. We would have used {name}, {country}; add "
+            "the country to the birthplace, or send latitude, longitude and timezone instead.",
+        )
+
+
 class TimezoneNotFound(ServiceError):
     def __init__(self) -> None:
         super().__init__(

@@ -89,7 +89,13 @@ def _install_routes(app: FastAPI) -> None:
     def chart(body: ChartRequest, request: Request) -> ChartPayload:
         state = request.app.state
         location = resolve_location(
-            body.place, body.latitude, body.longitude, body.timezone, state.geocoder, state.timezones
+            body.place,
+            body.latitude,
+            body.longitude,
+            body.timezone,
+            state.geocoder,
+            state.timezones,
+            reject_ambiguous=body.reject_ambiguous_place,
         )
         return build_chart(body, location)
 

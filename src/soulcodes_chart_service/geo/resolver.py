@@ -14,7 +14,7 @@ from typing import Protocol
 import geonamescache
 from timezonefinder import TimezoneFinder
 
-from ..errors import PlaceNotFound, TimezoneNotFound
+from ..errors import PlaceAmbiguous, PlaceNotFound, TimezoneNotFound
 from ..tz import canonical_zone_name
 from .offline import GeoMatch
 
@@ -80,8 +80,14 @@ def resolve_location(
     timezone: str | None,
     geocoder: Geocoder,
     timezone_lookup: TimezoneLookup,
+    reject_ambiguous: bool = False,
 ) -> Location:
-    """Coordinates and IANA zone for a birth, geocoding only what was not supplied."""
+    """Coordinates and IANA zone for a birth, geocoding only what was not supplied.
+
+    A bare name that other countries share is normally answered with the most populous
+    match and a warning. With `reject_ambiguous`, it is refused instead (`PlaceAmbiguous`),
+    for callers with nobody to check the guess, such as a self-serve form.
+    """
     match: GeoMatch | None = None
     warnings: list[str] = []
     if latitude is None or longitude is None:
@@ -90,6 +96,8 @@ def resolve_location(
             raise PlaceNotFound(place)
         latitude, longitude = match.latitude, match.longitude
         if match.ambiguous:
+            if reject_ambiguous:
+                raise PlaceAmbiguous(match.name, _country_names().get(match.country, match.country))
             warnings.append(ambiguity_warning(match))
     zone = _zone_for(timezone, match, latitude, longitude, timezone_lookup)
     return Location(latitude, longitude, zone, warnings)

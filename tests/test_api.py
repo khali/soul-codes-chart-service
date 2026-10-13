@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from soulcodes_chart_service.app import create_app
 from soulcodes_chart_service.config import Settings
+from soulcodes_chart_service.geo.offline import GeoMatch
 
 from .conftest import AMARA_REQUEST, AUTH, SAMPLE_REQUEST, TOKEN, FakeGeocoder, FakeTimezones
 
@@ -99,6 +100,32 @@ class TestValidation:
         response = client.post("/v1/chart", json={**SAMPLE_REQUEST, "place": "Atlantis"}, headers=AUTH)
         assert response.status_code == 422
         assert _error(response)["code"] == "place_not_found"
+
+    def test_ambiguous_place_is_guessed_with_a_warning_unless_refusal_is_requested(
+        self, geocoder: FakeGeocoder, timezones: FakeTimezones
+    ) -> None:
+        geocoder.places["Wellington"] = GeoMatch(
+            "Wellington", "NZ", -41.28664, 174.77557, "Pacific/Auckland", ambiguous=True
+        )
+        app = create_app(Settings(token=TOKEN), geocoder=geocoder, timezones=timezones)
+        body = {**AMARA_REQUEST, "place": "Wellington"}
+        with TestClient(app) as client:
+            guessed = client.post("/v1/chart", json=body, headers=AUTH)
+            assert guessed.status_code == 200
+            assert any(
+                "More than one place is called Wellington" in w for w in guessed.json()["meta"]["warnings"]
+            )
+
+            refused = client.post("/v1/chart", json={**body, "rejectAmbiguousPlace": True}, headers=AUTH)
+            assert refused.status_code == 422
+            assert _error(refused)["code"] == "place_ambiguous"
+
+            with_country = client.post(
+                "/v1/chart",
+                json={**AMARA_REQUEST, "rejectAmbiguousPlace": True},
+                headers=AUTH,
+            )
+            assert with_country.status_code == 200
 
     def test_timezone_name_is_canonicalised(self, client: TestClient) -> None:
         body = {**SAMPLE_REQUEST, "latitude": -33.87, "longitude": 151.21, "timezone": "australia/sydney"}
